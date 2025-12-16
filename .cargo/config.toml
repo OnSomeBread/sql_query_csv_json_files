@@ -1,0 +1,5 @@
+[build]
+rustflags = ["-Ctarget-cpu=native", "-Zthreads=24"]
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
