@@ -34,7 +34,7 @@ strip = true
 
 [profile.release]
 panic = "abort"
-lto = true
+lto = "thin"
 codegen-units = 1
 strip = true
 trim-paths = "all"
