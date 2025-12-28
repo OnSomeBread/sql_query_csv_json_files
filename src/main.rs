@@ -16,6 +16,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_writer(non_blocking)
         .without_time()
+        .with_target(false)
         .init();
 
     // init the ctx
