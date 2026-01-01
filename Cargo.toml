@@ -17,6 +17,8 @@ tracing-subscriber = { version = "0.3.22", default-features = false, features = 
 tracing-appender = { version = "0.2.4", default-features = false }
 rfd = { version = "0.16.0", default-features = false, features = ["tokio"] }
 anyhow = "1.0.100"
+serde = "1.0.228"
+serde_json = "1.0.148"
 
 [profile.dev]
 codegen-backend = "cranelift"
