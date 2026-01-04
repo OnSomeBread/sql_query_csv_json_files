@@ -31,7 +31,7 @@ pub async fn add_file_to_ctx(
                         writer.write_all(b"\n")?;
                     }
 
-                    let new_file = format!("{}{}", p.to_string_lossy(), "temp.json");
+                    let new_file = format!("{}/{}", p.to_string_lossy(), "temp.json");
                     std::fs::write(new_file.clone(), writer.into_inner())?;
 
                     ctx.register_json(table_name.clone(), new_file, NdJsonReadOptions::default())
