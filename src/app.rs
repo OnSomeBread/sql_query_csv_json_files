@@ -1,6 +1,7 @@
 use arrow::array::RecordBatch;
 use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use datafusion::execution::context::SessionConfig;
 use datafusion::{arrow::array::ArrayRef, prelude::SessionContext};
 use ratatui::{
     DefaultTerminal, Frame,
@@ -8,11 +9,8 @@ use ratatui::{
     style::{Color, Style, Stylize},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
-use rfd::FileDialog;
-use std::time::Duration;
-
-use datafusion::execution::context::SessionConfig;
 use rayon::prelude::*;
+use rfd::FileDialog;
 
 use crate::build_ctx;
 pub struct App {
@@ -32,7 +30,7 @@ impl App {
             curr_headers: vec![],
             curr_command: String::new(),
             curr_data: vec![],
-            shown_data: (20, 8),
+            shown_data: (50, 8),
             scroll_offset: (0, 0),
             next_table_name: b'a',
             ctx: SessionContext::new_with_config(config),
@@ -42,7 +40,7 @@ impl App {
     fn render(&self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(85), Constraint::Percentage(15)])
+            .constraints(vec![Constraint::Percentage(85), Constraint::Min(3)])
             .split(frame.area());
 
         let headers = Row::new(
@@ -64,19 +62,16 @@ impl App {
                     item.iter()
                         .skip(self.scroll_offset.1)
                         .take(self.scroll_offset.1 + self.shown_data.1)
-                        .map(|x| Cell::from(x.clone())),
+                        .cloned()
+                        .map(Cell::from),
                 )
                 .style(Style::new().fg(Color::White))
             });
 
         frame.render_widget(
-            Table::new(
-                rows,
-                (0..self.shown_data.1)
-                    .map(|_| Constraint::Percentage((100 / self.shown_data.1) as u16)),
-            )
-            .header(headers)
-            .block(Block::new().fg(Color::LightBlue).borders(Borders::ALL)),
+            Table::new(rows, (0..self.shown_data.1).map(|_| Constraint::Fill(1)))
+                .header(headers)
+                .block(Block::new().fg(Color::LightBlue).borders(Borders::ALL)),
             layout[0],
         );
 
@@ -91,26 +86,24 @@ impl App {
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         loop {
             terminal.draw(|frame| self.render(frame))?;
-            if event::poll(Duration::from_millis(20))?
-                && let Event::Key(key) = event::read()?
+            if let Event::Key(key) = event::read()?
                 && key.kind == KeyEventKind::Press
             {
-                if key.code == KeyCode::Esc {
-                    return Ok(());
-                } else if key.code == KeyCode::Up {
-                    self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(2);
-                } else if key.code == KeyCode::Down {
-                    self.scroll_offset.0 = self.scroll_offset.0.saturating_add(2);
-                } else if key.code == KeyCode::Left {
-                    self.scroll_offset.1 = self.scroll_offset.1.saturating_sub(1);
-                } else if key.code == KeyCode::Right {
-                    self.scroll_offset.1 = self.scroll_offset.1.saturating_add(1);
-                } else if key.code == KeyCode::Enter {
-                    self.parse_command().await?;
-                } else if key.code == KeyCode::Backspace {
-                    let _ = self.curr_command.pop();
-                } else if let Some(k) = key.code.as_char() {
-                    self.curr_command.push(k);
+                match key.code {
+                    KeyCode::Esc => return Ok(()),
+                    KeyCode::Up => self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(2),
+                    KeyCode::Down => self.scroll_offset.0 = self.scroll_offset.0.saturating_add(2),
+                    KeyCode::Left => self.scroll_offset.1 = self.scroll_offset.1.saturating_sub(1),
+                    KeyCode::Right => self.scroll_offset.1 = self.scroll_offset.1.saturating_add(1),
+                    KeyCode::Enter => self.parse_command().await?,
+                    KeyCode::Backspace => {
+                        let _ = self.curr_command.pop();
+                    }
+                    _ => {
+                        if let Some(k) = key.code.as_char() {
+                            self.curr_command.push(k);
+                        }
+                    }
                 }
             }
         }
