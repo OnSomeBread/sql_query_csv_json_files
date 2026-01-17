@@ -1,8 +1,8 @@
+use anyhow::Result;
 use arrow::array::RecordBatch;
-use color_eyre::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use datafusion::execution::context::SessionConfig;
 use datafusion::{arrow::array::ArrayRef, prelude::SessionContext};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Layout},

@@ -1,4 +1,4 @@
-use color_eyre::{Result, eyre::eyre};
+use anyhow::{Result, anyhow};
 use datafusion::prelude::*;
 use std::io::Write;
 pub async fn add_file_to_ctx(
@@ -37,14 +37,14 @@ pub async fn add_file_to_ctx(
                     ctx.register_json(table_name.clone(), new_file, NdJsonReadOptions::default())
                         .await?;
                 } else {
-                    return Err(eyre!("could not parse from json array or ndjson"));
+                    return Err(anyhow!("could not parse from json array or ndjson"));
                 }
             }
         } else {
-            return Err(eyre!("cannot parse this file format"));
+            return Err(anyhow!("cannot parse this file format"));
         }
     } else {
-        return Err(eyre!("could not parse file format"));
+        return Err(anyhow!("could not parse file format"));
     }
     Ok(())
 }

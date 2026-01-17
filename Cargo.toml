@@ -9,20 +9,14 @@ mimalloc = { version = "0.1.48", default-features = false }
 datafusion = { version = "52.0.0", default-features = false, features = [
     "sql",
 ] }
+arrow = { version = "57.2.0", default-features = false }
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "io-std"] }
-tracing = { version = "0.1.44", default-features = false }
-tracing-subscriber = { version = "0.3.22", default-features = false, features = [
-    "ansi",
-] }
-tracing-appender = { version = "0.2.4", default-features = false }
 rfd = { version = "0.17.2", default-features = false }
 serde = "1.0.228"
 serde_json = "1.0.149"
-crossterm = "0.29.0"
 ratatui = "0.30.0"
-color-eyre = "0.6.5"
-arrow = { version = "57.2.0", default-features = false }
 rayon = "1.11.0"
+anyhow = "1.0.100"
 
 [profile.dev]
 codegen-backend = "cranelift"
