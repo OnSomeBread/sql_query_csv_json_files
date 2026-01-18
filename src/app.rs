@@ -11,9 +11,12 @@ use ratatui::{
 };
 use rayon::prelude::*;
 use rfd::FileDialog;
+use std::collections::VecDeque;
 
 use crate::build_ctx;
 pub struct App {
+    command_history: VecDeque<String>,
+    command_history_idx: usize,
     curr_headers: Vec<String>,
     curr_command: String,
     curr_data: Vec<Vec<String>>,
@@ -26,6 +29,8 @@ impl App {
     pub fn new() -> Self {
         let config = SessionConfig::new().with_information_schema(true);
         Self {
+            command_history: VecDeque::new(),
+            command_history_idx: 0,
             curr_headers: vec![],
             curr_command: String::new(),
             curr_data: vec![],
@@ -82,9 +87,27 @@ impl App {
         // command input
         frame.render_widget(
             Paragraph::new(self.curr_command.clone())
+                .style(Style::new().fg(Color::White))
                 .block(Block::new().fg(Color::LightBlue).borders(Borders::ALL)),
             layout[1],
         );
+    }
+
+    fn get_next_command(&mut self) {
+        if let Some(val) = self.command_history.get(self.command_history_idx) {
+            self.curr_command = val.clone();
+            self.command_history_idx =
+                (self.command_history.len() - 1).min(self.command_history_idx + 1);
+        }
+    }
+
+    fn get_prev_command(&mut self) {
+        if self.command_history_idx > 0 {
+            self.command_history_idx -= 1;
+            self.curr_command = self.command_history[self.command_history_idx].clone();
+        } else {
+            self.curr_command = String::new();
+        }
     }
 
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -95,8 +118,12 @@ impl App {
             {
                 match key.code {
                     KeyCode::Esc => return Ok(()),
-                    KeyCode::Up => self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(3),
-                    KeyCode::Down => {
+                    KeyCode::Up => self.get_next_command(),
+                    KeyCode::Down => self.get_prev_command(),
+                    KeyCode::PageUp => {
+                        self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(3);
+                    }
+                    KeyCode::PageDown => {
                         self.scroll_offset.0 = self.curr_data.len().min(self.scroll_offset.0 + 3);
                     }
                     KeyCode::Left => self.scroll_offset.1 = self.scroll_offset.1.saturating_sub(1),
@@ -148,6 +175,7 @@ impl App {
         if self.curr_command.trim().eq_ignore_ascii_case("c") {
             self.create_table().await?;
         } else if self.curr_command.trim().eq_ignore_ascii_case("cls") {
+            self.curr_headers = vec![];
             self.curr_data = vec![];
         } else {
             match self.ctx.sql(self.curr_command.trim_end()).await {
@@ -172,7 +200,12 @@ impl App {
             }
         }
 
-        self.curr_command = String::new();
+        if !self.curr_command.trim().is_empty() {
+            self.command_history.push_front(self.curr_command.clone());
+            self.curr_command = String::new();
+        }
+
+        self.command_history_idx = 0;
         self.scroll_offset = (0, 0);
         Ok(())
     }
