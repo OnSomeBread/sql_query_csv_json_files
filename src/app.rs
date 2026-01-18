@@ -17,7 +17,6 @@ pub struct App {
     curr_headers: Vec<String>,
     curr_command: String,
     curr_data: Vec<Vec<String>>,
-    shown_data: (usize, usize),
     scroll_offset: (usize, usize),
     next_table_name: u8,
     ctx: SessionContext,
@@ -30,7 +29,6 @@ impl App {
             curr_headers: vec![],
             curr_command: String::new(),
             curr_data: vec![],
-            shown_data: (50, 8),
             scroll_offset: (0, 0),
             next_table_name: b'a',
             ctx: SessionContext::new_with_config(config),
@@ -43,11 +41,17 @@ impl App {
             .constraints(vec![Constraint::Percentage(85), Constraint::Min(3)])
             .split(frame.area());
 
+        let size = layout[0].as_size();
+        let (width, height) = (
+            (size.width / 24) as usize,
+            (size.height.saturating_sub(3)) as usize,
+        );
+
         let headers = Row::new(
             self.curr_headers
                 .iter()
                 .skip(self.scroll_offset.1)
-                .take(self.scroll_offset.1 + self.shown_data.1)
+                .take(self.scroll_offset.1 + width)
                 .cloned(),
         )
         .style(Style::new().bold().fg(Color::LightBlue));
@@ -56,12 +60,12 @@ impl App {
             .curr_data
             .iter()
             .skip(self.scroll_offset.0)
-            .take(self.scroll_offset.0 + self.shown_data.0)
+            .take(self.scroll_offset.0 + height)
             .map(|item| {
                 Row::new(
                     item.iter()
                         .skip(self.scroll_offset.1)
-                        .take(self.scroll_offset.1 + self.shown_data.1)
+                        .take(self.scroll_offset.1 + width)
                         .cloned()
                         .map(Cell::from),
                 )
@@ -69,7 +73,7 @@ impl App {
             });
 
         frame.render_widget(
-            Table::new(rows, (0..self.shown_data.1).map(|_| Constraint::Fill(1)))
+            Table::new(rows, (0..width).map(|_| Constraint::Fill(1)))
                 .header(headers)
                 .block(Block::new().fg(Color::LightBlue).borders(Borders::ALL)),
             layout[0],
@@ -91,10 +95,12 @@ impl App {
             {
                 match key.code {
                     KeyCode::Esc => return Ok(()),
-                    KeyCode::Up => self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(2),
-                    KeyCode::Down => self.scroll_offset.0 = self.scroll_offset.0.saturating_add(2),
+                    KeyCode::Up => self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(3),
+                    KeyCode::Down => {
+                        self.scroll_offset.0 = self.curr_data.len().min(self.scroll_offset.0 + 3);
+                    }
                     KeyCode::Left => self.scroll_offset.1 = self.scroll_offset.1.saturating_sub(1),
-                    KeyCode::Right => self.scroll_offset.1 = self.scroll_offset.1.saturating_add(1),
+                    KeyCode::Right => self.scroll_offset.1 += 1,
                     KeyCode::Enter => self.parse_command().await?,
                     KeyCode::Backspace => {
                         let _ = self.curr_command.pop();
