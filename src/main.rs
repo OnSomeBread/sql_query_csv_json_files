@@ -1,3 +1,4 @@
+#![feature(const_cmp, const_trait_impl, const_range)]
 use anyhow::Result;
 
 mod app;
