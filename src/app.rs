@@ -49,12 +49,13 @@ impl App {
     fn render(&self, frame: &mut Frame) {
         let layout = Layout::default()
             .direction(ratatui::layout::Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(85), Constraint::Min(3)])
+            .constraints(vec![Constraint::Percentage(100), Constraint::Min(3)])
             .split(frame.area());
 
         let size = layout[0].as_size();
         let (width, height) = (
-            (size.width / 24) as usize,
+            ((size.width / 20).min(self.curr_data.first().map_or_else(|| 0, |v| v.len() as u16)))
+                as usize,
             (size.height.saturating_sub(3)) as usize,
         );
 
@@ -91,7 +92,7 @@ impl App {
                         .fg(Color::LightBlue)
                         .borders(Borders::ALL)
                         .border_type(BorderType::Rounded)
-                        .title(self.file_names.join(", ")),
+                        .title(Line::from(self.file_names.join(", ")).bold()),
                 ),
             layout[0],
         );
@@ -105,23 +106,22 @@ impl App {
                 Span::from(" ").underlined(),
             ])
         } else {
-            let command: Vec<char> = self.curr_command.clone().chars().collect();
+            let command: Vec<char> = self.curr_command.chars().collect();
             Line::from(vec![
                 Span::from(command[..self.cursor].iter().collect::<String>()),
                 Span::from(command[self.cursor].to_string()).underlined(),
                 Span::from(command[self.cursor + 1..].iter().collect::<String>()),
             ])
-        };
+        }
+        .style(Style::new().fg(Color::White));
 
         frame.render_widget(
-            Paragraph::new(line)
-                .style(Style::new().fg(Color::White))
-                .block(
-                    Block::new()
-                        .fg(Color::LightBlue)
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Rounded),
-                ),
+            Paragraph::new(line).block(
+                Block::new()
+                    .fg(Color::LightBlue)
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Rounded),
+            ),
             layout[1],
         );
     }
@@ -146,14 +146,6 @@ impl App {
         }
     }
 
-    const fn move_cursor_right(&mut self) {
-        self.cursor = (self.curr_command.len().saturating_sub(1)).min(self.cursor + 1);
-    }
-
-    const fn move_cursor_left(&mut self) {
-        self.cursor = self.cursor.saturating_sub(1);
-    }
-
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         loop {
             terminal.draw(|frame| self.render(frame))?;
@@ -164,8 +156,8 @@ impl App {
                     KeyCode::Esc => return Ok(()),
                     KeyCode::Up => self.get_next_command(),
                     KeyCode::Down => self.get_prev_command(),
-                    KeyCode::Right => self.move_cursor_right(),
-                    KeyCode::Left => self.move_cursor_left(),
+                    KeyCode::Right => self.cursor = self.curr_command.len().min(self.cursor + 1),
+                    KeyCode::Left => self.cursor = self.cursor.saturating_sub(1),
                     KeyCode::PageUp => {
                         self.scroll_offset.0 = self.scroll_offset.0.saturating_sub(3);
                     }
@@ -211,7 +203,8 @@ impl App {
                 let value = if col.is_null(row) {
                     "null".to_string()
                 } else {
-                    arrow::util::display::array_value_to_string(col.as_ref(), row).unwrap()
+                    arrow::util::display::array_value_to_string(col.as_ref(), row)
+                        .unwrap_or_default()
                 };
                 values.push(value);
             }
@@ -223,9 +216,13 @@ impl App {
     }
 
     async fn parse_command(&mut self) -> Result<()> {
-        if self.curr_command.trim().eq_ignore_ascii_case("c") {
+        let parsed = self.curr_command.trim().to_ascii_lowercase();
+        if parsed.is_empty() {
+            return Ok(());
+        } else if parsed == "create" {
             self.create_table().await?;
-        } else if self.curr_command.trim().eq_ignore_ascii_case("cls") {
+            self.curr_headers = vec![];
+        } else if parsed == "cls" {
             self.curr_headers = vec![];
             self.curr_data = vec![];
         } else {
@@ -251,7 +248,7 @@ impl App {
             }
         }
 
-        if !self.curr_command.trim().is_empty() {
+        if !parsed.is_empty() {
             self.command_history.push_front(self.curr_command.clone());
             self.curr_command = String::new();
         }
@@ -281,7 +278,7 @@ impl App {
 
         self.file_names.push(format!(
             "{} - {}",
-            file_location.file_name().unwrap().display(),
+            file_location.file_name().unwrap_or_default().display(),
             tn
         ));
 
